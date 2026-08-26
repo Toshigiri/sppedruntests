@@ -79,18 +79,22 @@ async function loadSettings() {
     const res = await fetch("/api/settings");
     if (!res.ok) throw new Error("bad status " + res.status);
     const data = await res.json();
-    return data.examDates || {};
+    return {
+      examDates: data.examDates || {},
+      customPhrases: data.customPhrases || [],
+      urgentDays: Number.isFinite(data.urgentDays) ? data.urgentDays : 7,
+    };
   } catch (e) {
     console.error("failed to load settings", e);
-    return {};
+    return { examDates: {}, customPhrases: [], urgentDays: 7 };
   }
 }
-async function saveExamDates(dates) {
+async function saveSettings() {
   try {
     await fetch("/api/settings", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ examDates: dates }),
+      body: JSON.stringify(settings),
     });
   } catch (e) { /* best effort */ }
 }
@@ -157,7 +161,7 @@ let aiSuggestion = null;
 let aiExpiryTimer = null;
 let trackingError = null;
 let trackingConfig = { idleAfterSec: 90, awaySec: 20, aiIntervalSec: 25, aiEnabled: true, webcamEnabled: true };
-let examDates = {}; // { [subjectKey]: "YYYY-MM-DD" }
+let settings = { examDates: {}, customPhrases: [], urgentDays: 7 };
 
 function subject() { return SUBJECTS[subjectKey]; }
 function parseDrillQuestions(raw) {
@@ -360,7 +364,9 @@ function render(tickOnly) {
     document.getElementById("paperConfig").style.display = mode === MODES.PAPER ? "block" : "none";
     document.getElementById("drillConfig").style.display = mode === MODES.DRILL ? "block" : "none";
     document.getElementById("rawConfig").style.display = mode === MODES.RAW ? "block" : "none";
-    document.getElementById("examDateInput").value = examDates[subjectKey] || "";
+    document.getElementById("examDateInput").value = settings.examDates[subjectKey] || "";
+    document.getElementById("urgentDaysInput").value = settings.urgentDays;
+    document.getElementById("customPhrasesInput").value = settings.customPhrases.join("\n");
     document.getElementById("paperNameInput").value = paperName;
     document.getElementById("sectionsInput").value = sectionNames.join("\n");
     document.getElementById("drillCountInput").value = drillCount;
@@ -529,14 +535,15 @@ function renderTrackingBar() {
 
 function renderCountdown() {
   const area = document.getElementById("countdownArea");
-  const dateStr = examDates[subjectKey];
+  const dateStr = settings.examDates[subjectKey];
   if (!dateStr) {
     area.innerHTML = `<div class="countdown-empty">Set your ${subject().label} exam date in ⚙ to start the countdown.</div>`;
     return;
   }
   const days = daysUntil(dateStr);
-  const phrase = MOTIVATIONAL_PHRASES[(new Date().getDate() - 1) % MOTIVATIONAL_PHRASES.length];
-  const urgent = days <= 7;
+  const phrases = settings.customPhrases.length ? settings.customPhrases : MOTIVATIONAL_PHRASES;
+  const phrase = phrases[(new Date().getDate() - 1) % phrases.length];
+  const urgent = days <= settings.urgentDays;
   const daysLabel = days > 0 ? `${days} day${days === 1 ? "" : "s"} left` : days === 0 ? "Exam day." : "Exam's passed — set a new date";
   area.innerHTML = `
     <div class="countdown-bar${urgent ? " urgent" : ""}">
@@ -663,14 +670,26 @@ document.getElementById("idleAfterInput").oninput = (e) => { trackingConfig.idle
 document.getElementById("awayAfterInput").oninput = (e) => { trackingConfig.awaySec = Math.max(5, Number(e.target.value) || 20); applyTrackingConfig(); };
 document.getElementById("aiIntervalInput").oninput = (e) => { trackingConfig.aiIntervalSec = Math.max(15, Number(e.target.value) || 25); applyTrackingConfig(); };
 document.getElementById("examDateInput").onchange = (e) => {
-  if (e.target.value) examDates[subjectKey] = e.target.value; else delete examDates[subjectKey];
-  saveExamDates(examDates);
+  if (e.target.value) settings.examDates[subjectKey] = e.target.value; else delete settings.examDates[subjectKey];
+  saveSettings();
+  render();
+};
+document.getElementById("urgentDaysInput").oninput = (e) => {
+  settings.urgentDays = Math.max(1, Math.min(90, Number(e.target.value) || 7));
+  saveSettings();
+  render();
+};
+document.getElementById("customPhrasesInput").oninput = (e) => {
+  settings.customPhrases = e.target.value.split("\n").map((s) => s.trim()).filter(Boolean);
+  saveSettings();
   render();
 };
 
 // ---------- init ----------
 (async function init() {
-  [store, examDates] = await Promise.all([loadRuns(), loadSettings()]);
+  const [runsResult, settingsResult] = await Promise.all([loadRuns(), loadSettings()]);
+  store = runsResult;
+  settings = settingsResult;
   applyTrackingConfig();
   render();
 })();

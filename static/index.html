@@ -54,9 +54,19 @@
     </div>
 
     <div class="section-divider">EXAM COUNTDOWN</div>
-    <div class="field">
-      <span class="field-hint">Exam date for this subject</span>
-      <input class="input" id="examDateInput" type="date" style="width:170px;" />
+    <div class="tracking-config-row">
+      <div class="field">
+        <span class="field-hint">Exam date for this subject</span>
+        <input class="input" id="examDateInput" type="date" style="width:170px;" />
+      </div>
+      <div class="field">
+        <span class="field-hint">Turn red inside (days)</span>
+        <input class="input" id="urgentDaysInput" type="number" min="1" max="90" style="width:84px;" />
+      </div>
+    </div>
+    <div class="field" style="margin-top:2px;">
+      <span class="field-hint">Custom phrases, one per line — leave blank to use the defaults. Rotates one per day of the month.</span>
+      <textarea class="input" id="customPhrasesInput" rows="4"></textarea>
     </div>
 
     <div class="section-divider">TRACKING</div>

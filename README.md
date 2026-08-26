@@ -54,8 +54,10 @@ plain `.html` file — `getUserMedia`/`getDisplayMedia` are blocked on `file://`
   count, but the "pick specific questions" field overrides that with an exact list (e.g.
   `3, 7, 12b`) — bare numbers get a `Q` prefix, anything else is used literally.
 - **Exam countdown** — set a per-subject exam date in the config panel and a days-left
-  banner appears above the mode row, with one of 30 phrases rotating daily. Turns red
-  inside the last week. Dates are stored in `data/settings.json`.
+  banner appears above the mode row, with one of 30 built-in phrases rotating daily.
+  Both the "turns red inside N days" threshold (default 7) and the phrase list itself
+  are editable in the same config section — paste your own phrases, one per line, to
+  replace the defaults entirely. Everything's stored in `data/settings.json`.
 - **Enable tracking** — click it to get the browser's native screen-share and webcam
   permission prompts. You can grant either one, both, or neither; tracking works with
   whatever you allow. A dot in the tracking bar goes amber and the status text changes

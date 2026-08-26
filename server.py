@@ -85,14 +85,17 @@ def _save_runs(runs):
     DATA_FILE.write_text(json.dumps({"runs": runs}, indent=2), encoding="utf-8")
 
 
+SETTINGS_DEFAULTS = {"examDates": {}, "customPhrases": [], "urgentDays": 7}
+
+
 def _load_settings():
     if not SETTINGS_FILE.exists():
-        return {"examDates": {}}
+        return dict(SETTINGS_DEFAULTS)
     try:
         data = json.loads(SETTINGS_FILE.read_text(encoding="utf-8"))
-        return {"examDates": data.get("examDates", {})}
+        return {k: data.get(k, default) for k, default in SETTINGS_DEFAULTS.items()}
     except (json.JSONDecodeError, OSError):
-        return {"examDates": {}}
+        return dict(SETTINGS_DEFAULTS)
 
 
 def _save_settings(settings):
@@ -103,6 +106,8 @@ def _save_settings(settings):
 
 class Settings(BaseModel):
     examDates: dict[str, str] = {}
+    customPhrases: list[str] = []
+    urgentDays: int = 7
 
 
 @app.get("/api/settings")
