@@ -53,6 +53,12 @@ plain `.html` file — `getUserMedia`/`getDisplayMedia` are blocked on `file://`
   permission prompts. You can grant either one, both, or neither; tracking works with
   whatever you allow. A dot in the tracking bar goes amber and the status text changes
   when idle/away is detected.
+- **No camera mode** — untick "Track webcam" in the config panel before enabling tracking
+  and the webcam permission prompt is never shown at all — no camera access is requested,
+  full stop. You keep screen idle detection (and AI section detection, if that's on);
+  away-from-desk detection just isn't available. Takes effect next time you click Enable
+  tracking (it's locked while tracking is already active, so it doesn't get changed out
+  from under a running session).
 - **Idle detection (screen, local only)** — every ~1.2s the browser diffs the current
   screen frame against the previous one at low resolution. No visible change for longer
   than the configured "idle after" threshold (default 90s) is logged as an idle spell.

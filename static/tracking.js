@@ -191,7 +191,10 @@ const Tracker = (() => {
     isActive() { return !!(screenStream || webcamStream); },
     status,
 
-    async enable() {
+    // opts.webcam === false skips getUserMedia entirely — no camera
+    // permission prompt is ever shown, i.e. "no camera" mode.
+    async enable(opts = {}) {
+      const wantWebcam = opts.webcam !== false;
       const errors = [];
       if (!diffCanvasScreen) diffCanvasScreen = document.createElement("canvas");
       if (!diffCanvasWebcam) diffCanvasWebcam = document.createElement("canvas");
@@ -208,15 +211,17 @@ const Tracker = (() => {
         errors.push("Screen share permission was not granted.");
       }
 
-      try {
-        webcamStream = await navigator.mediaDevices.getUserMedia({ video: true });
-        videoWebcam = mkVideo();
-        videoWebcam.srcObject = webcamStream;
-        webcamStream.getVideoTracks()[0].addEventListener("ended", () => {
-          webcamStream = null; videoWebcam?.remove(); videoWebcam = null; emitStatus();
-        });
-      } catch (e) {
-        errors.push("Webcam permission was not granted.");
+      if (wantWebcam) {
+        try {
+          webcamStream = await navigator.mediaDevices.getUserMedia({ video: true });
+          videoWebcam = mkVideo();
+          videoWebcam.srcObject = webcamStream;
+          webcamStream.getVideoTracks()[0].addEventListener("ended", () => {
+            webcamStream = null; videoWebcam?.remove(); videoWebcam = null; emitStatus();
+          });
+        } catch (e) {
+          errors.push("Webcam permission was not granted.");
+        }
       }
 
       if (screenStream || webcamStream) startTimers();

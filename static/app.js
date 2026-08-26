@@ -96,7 +96,7 @@ let runEvents = [];
 let aiSuggestion = null;
 let aiExpiryTimer = null;
 let trackingError = null;
-let trackingConfig = { idleAfterSec: 90, awaySec: 20, aiIntervalSec: 25, aiEnabled: true };
+let trackingConfig = { idleAfterSec: 90, awaySec: 20, aiIntervalSec: 25, aiEnabled: true, webcamEnabled: true };
 
 function subject() { return SUBJECTS[subjectKey]; }
 function activeLabels() {
@@ -243,7 +243,7 @@ async function toggleTracking() {
   }
   const btn = document.getElementById("trackingToggleBtn");
   if (btn) btn.disabled = true;
-  const result = await Tracker.enable();
+  const result = await Tracker.enable({ webcam: trackingConfig.webcamEnabled });
   trackingError = result.errors.length ? result.errors.join(" ") : null;
   if (btn) btn.disabled = false;
   render();
@@ -287,6 +287,8 @@ function render(tickOnly) {
     document.getElementById("paperNameInput").value = paperName;
     document.getElementById("sectionsInput").value = sectionNames.join("\n");
     document.getElementById("drillCountInput").value = drillCount;
+    document.getElementById("webcamEnabledInput").checked = trackingConfig.webcamEnabled;
+    document.getElementById("webcamEnabledInput").disabled = Tracker.isActive();
     document.getElementById("aiEnabledInput").checked = trackingConfig.aiEnabled;
     document.getElementById("idleAfterInput").value = trackingConfig.idleAfterSec;
     document.getElementById("awayAfterInput").value = trackingConfig.awaySec;
@@ -416,7 +418,8 @@ function renderTrackingBar() {
   const errorArea = document.getElementById("trackingErrorArea");
 
   if (!st.screenOn && !st.webcamOn) {
-    statusEl.innerHTML = `<span class="rec-dot off"></span><span class="txt">Tracking off — nothing leaves this machine until you enable it</span>`;
+    const camNote = trackingConfig.webcamEnabled ? "" : " (no camera mode — webcam won't be requested)";
+    statusEl.innerHTML = `<span class="rec-dot off"></span><span class="txt">Tracking off — nothing leaves this machine until you enable it${camNote}</span>`;
     btn.textContent = "Enable tracking";
     btn.className = "tracking-btn enable";
   } else {
@@ -541,6 +544,7 @@ document.getElementById("drillCountInput").oninput = (e) => {
 };
 document.getElementById("clearBtn").onclick = clearHistory;
 document.getElementById("trackingToggleBtn").onclick = toggleTracking;
+document.getElementById("webcamEnabledInput").onchange = (e) => { trackingConfig.webcamEnabled = e.target.checked; render(); };
 document.getElementById("aiEnabledInput").onchange = (e) => { trackingConfig.aiEnabled = e.target.checked; applyTrackingConfig(); render(); };
 document.getElementById("idleAfterInput").oninput = (e) => { trackingConfig.idleAfterSec = Math.max(10, Number(e.target.value) || 90); applyTrackingConfig(); };
 document.getElementById("awayAfterInput").oninput = (e) => { trackingConfig.awaySec = Math.max(5, Number(e.target.value) || 20); applyTrackingConfig(); };
