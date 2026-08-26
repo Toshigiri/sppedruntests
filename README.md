@@ -46,9 +46,16 @@ plain `.html` file — `getUserMedia`/`getDisplayMedia` are blocked on `file://`
 ## How it works
 
 - **Timer / splits / PBs** — same mechanics as before: pick a subject, pick Full Paper
-  (split per section) or Topic Drill (split per question), start, split, finish. Runs and
-  PBs are stored in `data/runs.json` on disk (not `localStorage` — a JSON file survives
-  the app restarting cleanly and doesn't need any DB setup).
+  (split per section), Topic Drill (split per question), or Raw Practice (plain stopwatch,
+  no splits, no PB — just logs total time), start, split, finish. Runs and PBs are stored
+  in `data/runs.json` on disk (not `localStorage` — a JSON file survives the app
+  restarting cleanly and doesn't need any DB setup).
+- **Topic Drill question picking** — by default it generates Q1..N from the question
+  count, but the "pick specific questions" field overrides that with an exact list (e.g.
+  `3, 7, 12b`) — bare numbers get a `Q` prefix, anything else is used literally.
+- **Exam countdown** — set a per-subject exam date in the config panel and a days-left
+  banner appears above the mode row, with one of 30 phrases rotating daily. Turns red
+  inside the last week. Dates are stored in `data/settings.json`.
 - **Enable tracking** — click it to get the browser's native screen-share and webcam
   permission prompts. You can grant either one, both, or neither; tracking works with
   whatever you allow. A dot in the tracking bar goes amber and the status text changes

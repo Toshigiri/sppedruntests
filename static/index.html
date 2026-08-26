@@ -19,10 +19,13 @@
     <div class="subject-switch" id="subjectSwitch"></div>
   </div>
 
+  <div id="countdownArea"></div>
+
   <div class="mode-row">
     <div class="mode-toggle-group">
       <button class="mode-btn" id="modePaperBtn">Full Paper</button>
       <button class="mode-btn" id="modeDrillBtn">Topic Drill</button>
+      <button class="mode-btn" id="modeRawBtn">Raw Practice</button>
     </div>
     <button class="config-btn" id="configToggle" title="Configure">⚙</button>
   </div>
@@ -45,6 +48,15 @@
         <span class="field-hint">Or pick specific questions — overrides count above</span>
         <input class="input" id="drillQuestionsInput" placeholder="e.g. 3, 7, 12b" />
       </div>
+    </div>
+    <div id="rawConfig" style="display:none;">
+      <div class="privacy-note">Raw practice is a plain stopwatch — no sections, no splits, no PB comparison. Start, stop, it logs the total time to history. Idle/away tracking and AI section detection still run if enabled, though there's no fixed question list for the AI check to match against.</div>
+    </div>
+
+    <div class="section-divider">EXAM COUNTDOWN</div>
+    <div class="field">
+      <span class="field-hint">Exam date for this subject</span>
+      <input class="input" id="examDateInput" type="date" style="width:170px;" />
     </div>
 
     <div class="section-divider">TRACKING</div>

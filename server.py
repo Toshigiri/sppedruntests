@@ -32,6 +32,7 @@ load_dotenv()
 ROOT = Path(__file__).parent
 DATA_DIR = Path(os.environ.get("DATA_DIR") or (ROOT / "data"))
 DATA_FILE = DATA_DIR / "runs.json"
+SETTINGS_FILE = DATA_DIR / "settings.json"
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 # LM Studio's local server (Developer tab -> Start Server), OpenAI-compatible.
@@ -82,6 +83,39 @@ def _load_runs():
 
 def _save_runs(runs):
     DATA_FILE.write_text(json.dumps({"runs": runs}, indent=2), encoding="utf-8")
+
+
+def _load_settings():
+    if not SETTINGS_FILE.exists():
+        return {"examDates": {}}
+    try:
+        data = json.loads(SETTINGS_FILE.read_text(encoding="utf-8"))
+        return {"examDates": data.get("examDates", {})}
+    except (json.JSONDecodeError, OSError):
+        return {"examDates": {}}
+
+
+def _save_settings(settings):
+    SETTINGS_FILE.write_text(json.dumps(settings, indent=2), encoding="utf-8")
+
+
+# ------------------------------------------------------------ settings API
+
+class Settings(BaseModel):
+    examDates: dict[str, str] = {}
+
+
+@app.get("/api/settings")
+def get_settings():
+    with _lock:
+        return _load_settings()
+
+
+@app.post("/api/settings")
+def save_settings(settings: Settings):
+    with _lock:
+        _save_settings(settings.model_dump())
+    return {"ok": True}
 
 
 # ---------------------------------------------------------------- runs API

@@ -11,7 +11,40 @@ const SUBJECTS = {
     drillTopics: ["Article Writing", "Comprehension", "Summary", "Vocabulary", "Narrative Writing"],
   },
 };
-const MODES = { PAPER: "paper", DRILL: "drill" };
+const MODES = { PAPER: "paper", DRILL: "drill", RAW: "raw" };
+
+const MOTIVATIONAL_PHRASES = [
+  "Tick tock. The exam board isn't waiting for you to feel ready.",
+  "Somewhere, someone with your exact grade target is already three papers ahead of you today.",
+  "You can't split a section you never practiced.",
+  "The exam doesn't care that you were tired.",
+  "Every scrolled minute is a point you didn't earn.",
+  "Future you is currently begging present you to open a past paper.",
+  "There is no \"catching up\" the night before. There is only what you did today.",
+  "The gap between a pass and a fail is usually one more practice paper.",
+  "Nobody remembers your excuses. Everyone remembers your grade.",
+  "The clock in this app is generous. The one in the exam hall is not.",
+  "You've spent longer thinking about not studying than studying would take.",
+  "Discomfort now is cheaper than regret later.",
+  "This is the version of you the exam will actually meet.",
+  "Confidence you didn't earn is just a louder kind of unprepared.",
+  "The paper doesn't grade effort. It grades output.",
+  "Every day you skip, tomorrow-you inherits the debt.",
+  "You don't rise to the exam. You fall to the level of your practice.",
+  "The countdown doesn't pause for motivation. Start anyway.",
+  "There's a version of this exam where you already know every question. Go build it.",
+  "Hope is not a revision strategy.",
+  "Somewhere your target grade is sitting on a piece of paper that doesn't know your name yet.",
+  "The examiner has read a thousand answers like the one you're about to rush.",
+  "You don't need to feel ready. You need to be ready.",
+  "Last-minute cramming is just paying interest on procrastination.",
+  "The best time to start was this morning. The next best time is now.",
+  "Every split you avoid today is a section you'll be guessing on later.",
+  "This countdown only goes one direction.",
+  "Your future transcript is being written today, in pencil, by you.",
+  "No one is coming to make today count for you.",
+  "The exam is closer than it feels and further than you're acting like it is.",
+];
 
 // ---------- backend persistence ----------
 async function loadRuns() {
@@ -41,6 +74,26 @@ async function saveRun(run) {
 async function clearHistoryRemote() {
   try { await fetch("/api/runs", { method: "DELETE" }); } catch (e) { /* best effort */ }
 }
+async function loadSettings() {
+  try {
+    const res = await fetch("/api/settings");
+    if (!res.ok) throw new Error("bad status " + res.status);
+    const data = await res.json();
+    return data.examDates || {};
+  } catch (e) {
+    console.error("failed to load settings", e);
+    return {};
+  }
+}
+async function saveExamDates(dates) {
+  try {
+    await fetch("/api/settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ examDates: dates }),
+    });
+  } catch (e) { /* best effort */ }
+}
 
 // ---------- helpers ----------
 function fmt(ms) {
@@ -63,6 +116,12 @@ function fmtShort(ms) {
   return m > 0 ? `${m}m${String(s).padStart(2, "0")}s` : `${s}s`;
 }
 function uid() { return Math.random().toString(36).slice(2, 10); }
+function daysUntil(dateStr) {
+  const target = new Date(dateStr + "T00:00:00");
+  const now = new Date();
+  const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  return Math.ceil((target - todayMidnight) / 86400000);
+}
 function prefixSums(segArr) {
   const out = [];
   let sum = 0;
@@ -98,6 +157,7 @@ let aiSuggestion = null;
 let aiExpiryTimer = null;
 let trackingError = null;
 let trackingConfig = { idleAfterSec: 90, awaySec: 20, aiIntervalSec: 25, aiEnabled: true, webcamEnabled: true };
+let examDates = {}; // { [subjectKey]: "YYYY-MM-DD" }
 
 function subject() { return SUBJECTS[subjectKey]; }
 function parseDrillQuestions(raw) {
@@ -105,10 +165,12 @@ function parseDrillQuestions(raw) {
 }
 function activeLabels() {
   if (mode === MODES.PAPER) return sectionNames;
+  if (mode === MODES.RAW) return [];
   const custom = parseDrillQuestions(drillQuestions);
   return custom.length ? custom : Array.from({ length: drillCount }, (_, i) => `Q${i + 1}`);
 }
 function currentKey() {
+  if (mode === MODES.RAW) return `raw:${subjectKey}`;
   return mode === MODES.PAPER ? `paper:${subjectKey}:${paperName}` : `drill:${subjectKey}:${drillTopic}`;
 }
 function bestForKey(key) {
@@ -158,18 +220,23 @@ function stopEarly() {
   splits.push({ name, ms: segMs });
   finish(now);
 }
+function stopRaw() {
+  const now = Date.now() - startTime;
+  if (now < 200) { running = false; cancelAnimationFrame(rafId); render(); return; }
+  finish(now); // no splits recorded — raw practice is a plain stopwatch
+}
 function finish(totalMs) {
   Tracker.flush(); // close out any ongoing idle/away spell while `running` is still true
   running = false;
   cancelAnimationFrame(rafId);
   clearAiSuggestion();
-  const label = mode === MODES.PAPER
-    ? `${subject().label} — ${paperName}`
+  const label = mode === MODES.PAPER ? `${subject().label} — ${paperName}`
+    : mode === MODES.RAW ? `${subject().label} — Raw practice`
     : `${subject().label} — ${drillTopic} ×${activeLabels().length}`;
   const key = currentKey();
-  const priorBestRun = bestForKey(key);
+  const priorBestRun = mode === MODES.RAW ? null : bestForKey(key);
   const priorBest = priorBestRun ? priorBestRun.totalMs : Infinity;
-  const isPB = totalMs < priorBest;
+  const isPB = mode !== MODES.RAW && totalMs < priorBest;
 
   const run = {
     id: uid(), key, subject: subjectKey, mode, label,
@@ -284,12 +351,16 @@ function render(tickOnly) {
     // mode buttons
     document.getElementById("modePaperBtn").className = "mode-btn" + (mode === MODES.PAPER ? " active" : "");
     document.getElementById("modeDrillBtn").className = "mode-btn" + (mode === MODES.DRILL ? " active" : "");
+    document.getElementById("modeRawBtn").className = "mode-btn" + (mode === MODES.RAW ? " active" : "");
     document.getElementById("modePaperBtn").disabled = running;
     document.getElementById("modeDrillBtn").disabled = running;
+    document.getElementById("modeRawBtn").disabled = running;
 
     // config panel
     document.getElementById("paperConfig").style.display = mode === MODES.PAPER ? "block" : "none";
     document.getElementById("drillConfig").style.display = mode === MODES.DRILL ? "block" : "none";
+    document.getElementById("rawConfig").style.display = mode === MODES.RAW ? "block" : "none";
+    document.getElementById("examDateInput").value = examDates[subjectKey] || "";
     document.getElementById("paperNameInput").value = paperName;
     document.getElementById("sectionsInput").value = sectionNames.join("\n");
     document.getElementById("drillCountInput").value = drillCount;
@@ -312,8 +383,9 @@ function render(tickOnly) {
     });
 
     // run label
-    document.getElementById("runLabel").textContent = mode === MODES.PAPER
-      ? `${s.code} · ${paperName}` : `${s.code} · ${drillTopic} ×${activeLabels().length}`;
+    document.getElementById("runLabel").textContent = mode === MODES.PAPER ? `${s.code} · ${paperName}`
+      : mode === MODES.RAW ? `${s.code} · Raw practice`
+      : `${s.code} · ${drillTopic} ×${activeLabels().length}`;
 
     // control row
     const cr = document.getElementById("controlRow");
@@ -331,6 +403,12 @@ function render(tickOnly) {
         resetBtn.onclick = reset;
         cr.appendChild(resetBtn);
       }
+    } else if (mode === MODES.RAW) {
+      const stopBtn = document.createElement("button");
+      stopBtn.className = "stop-btn";
+      stopBtn.innerHTML = `<span class="btn-glyph">■</span>Stop`;
+      stopBtn.onclick = stopRaw;
+      cr.appendChild(stopBtn);
     } else {
       const splitBtn = document.createElement("button");
       splitBtn.className = "main-btn";
@@ -347,6 +425,7 @@ function render(tickOnly) {
     renderTrackingBar();
     renderAiBanner();
     renderSplits();
+    renderCountdown();
 
     // finish card
     const finishCard = document.getElementById("finishCard");
@@ -362,6 +441,7 @@ function render(tickOnly) {
         html += `<div class="finish-sub ${diff < 0 ? 'neg' : 'pos'}">${fmtDelta(diff)} vs previous best</div>`;
       }
       html += `<div class="finish-time" style="color:${diff > 0 ? 'var(--red)' : 'var(--green)'}">${fmt(justFinished.totalMs)}</div>`;
+      html += `<div class="finish-date">${new Date(justFinished.date).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" })}</div>`;
       finishCard.innerHTML = html;
       if (justFinished.saving) {
         saveErrorArea.innerHTML = `<div style="font-size:12px;color:var(--text-faint);">Saving run…</div>`;
@@ -401,8 +481,10 @@ function render(tickOnly) {
   bigTime.className = "big-time" + (running ? " live" : "");
 
   const deltaArea = document.getElementById("deltaArea");
-  const pb = bestForKey(currentKey());
-  if (pb) {
+  const pb = mode === MODES.RAW ? null : bestForKey(currentKey());
+  if (mode === MODES.RAW) {
+    deltaArea.innerHTML = `<div class="delta-muted">Raw practice — logged, not scored</div>`;
+  } else if (pb) {
     const liveDelta = elapsed - pb.totalMs;
     if (running) {
       deltaArea.innerHTML = `<div class="delta-line" style="color:${liveDelta > 0 ? 'var(--red)' : 'var(--green)'}">${fmtDelta(liveDelta)}<span class="delta-sub"> vs PB</span></div>`;
@@ -445,6 +527,24 @@ function renderTrackingBar() {
   errorArea.innerHTML = trackingError ? `<div class="tracking-error">${trackingError}</div>` : "";
 }
 
+function renderCountdown() {
+  const area = document.getElementById("countdownArea");
+  const dateStr = examDates[subjectKey];
+  if (!dateStr) {
+    area.innerHTML = `<div class="countdown-empty">Set your ${subject().label} exam date in ⚙ to start the countdown.</div>`;
+    return;
+  }
+  const days = daysUntil(dateStr);
+  const phrase = MOTIVATIONAL_PHRASES[(new Date().getDate() - 1) % MOTIVATIONAL_PHRASES.length];
+  const urgent = days <= 7;
+  const daysLabel = days > 0 ? `${days} day${days === 1 ? "" : "s"} left` : days === 0 ? "Exam day." : "Exam's passed — set a new date";
+  area.innerHTML = `
+    <div class="countdown-bar${urgent ? " urgent" : ""}">
+      <div class="countdown-days">${daysLabel}</div>
+      <div class="countdown-phrase">${phrase}</div>
+    </div>`;
+}
+
 function renderAiBanner() {
   const area = document.getElementById("aiBannerArea");
   if (!aiSuggestion || !running) { area.innerHTML = ""; return; }
@@ -478,7 +578,7 @@ function eventChipsFor(events, idx) {
 
 function renderSplits() {
   const splitsCard = document.getElementById("splitsCard");
-  if (!(running || splits.length > 0)) {
+  if (mode === MODES.RAW || !(running || splits.length > 0)) {
     splitsCard.className = "splits-card";
     splitsCard.innerHTML = "";
     return;
@@ -539,6 +639,7 @@ function onSubjectChange() {
 // ---------- event wiring (static elements) ----------
 document.getElementById("modePaperBtn").onclick = () => { if (!running) { mode = MODES.PAPER; clearRunView(); render(); } };
 document.getElementById("modeDrillBtn").onclick = () => { if (!running) { mode = MODES.DRILL; clearRunView(); render(); } };
+document.getElementById("modeRawBtn").onclick = () => { if (!running) { mode = MODES.RAW; clearRunView(); render(); } };
 document.getElementById("configToggle").onclick = () => {
   document.getElementById("configPanel").classList.toggle("open");
 };
@@ -561,10 +662,15 @@ document.getElementById("aiEnabledInput").onchange = (e) => { trackingConfig.aiE
 document.getElementById("idleAfterInput").oninput = (e) => { trackingConfig.idleAfterSec = Math.max(10, Number(e.target.value) || 90); applyTrackingConfig(); };
 document.getElementById("awayAfterInput").oninput = (e) => { trackingConfig.awaySec = Math.max(5, Number(e.target.value) || 20); applyTrackingConfig(); };
 document.getElementById("aiIntervalInput").oninput = (e) => { trackingConfig.aiIntervalSec = Math.max(15, Number(e.target.value) || 25); applyTrackingConfig(); };
+document.getElementById("examDateInput").onchange = (e) => {
+  if (e.target.value) examDates[subjectKey] = e.target.value; else delete examDates[subjectKey];
+  saveExamDates(examDates);
+  render();
+};
 
 // ---------- init ----------
 (async function init() {
-  store = await loadRuns();
+  [store, examDates] = await Promise.all([loadRuns(), loadSettings()]);
   applyTrackingConfig();
   render();
 })();
