@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Exam Speedrun</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/style.css">
+</head>
+<body>
+<div class="container">
+
+  <div class="header">
+    <div>
+      <div class="eyebrow">EXAM SPEEDRUN</div>
+      <div class="h1">Any% — No Skips</div>
+    </div>
+    <div class="subject-switch" id="subjectSwitch"></div>
+  </div>
+
+  <div class="mode-row">
+    <button class="mode-btn" id="modePaperBtn">Full Paper</button>
+    <button class="mode-btn" id="modeDrillBtn">Topic Drill</button>
+    <button class="config-btn" id="configToggle" title="Configure">⚙</button>
+  </div>
+
+  <div class="config-panel" id="configPanel">
+    <div id="paperConfig">
+      <div class="label">Paper name</div>
+      <input class="input" id="paperNameInput" />
+      <div class="label">Sections (splits), one per line</div>
+      <textarea class="input" id="sectionsInput" rows="4"></textarea>
+    </div>
+    <div id="drillConfig" style="display:none;">
+      <div class="label">Drill topic</div>
+      <div class="chip-row" id="topicChips"></div>
+      <div class="label">Question count</div>
+      <input class="input" id="drillCountInput" type="number" min="1" max="50" style="width:90px;" />
+    </div>
+
+    <div class="section-divider">TRACKING</div>
+    <div class="checkbox-row">
+      <input type="checkbox" id="aiEnabledInput" />
+      <label for="aiEnabledInput">Enable AI section detection (sends downscaled screenshots to Claude)</label>
+    </div>
+    <div class="tracking-config-row">
+      <div class="field">
+        <span class="field-hint">Idle after (sec)</span>
+        <input class="input" id="idleAfterInput" type="number" min="10" max="1800" />
+      </div>
+      <div class="field">
+        <span class="field-hint">Away after (sec)</span>
+        <input class="input" id="awayAfterInput" type="number" min="5" max="600" />
+      </div>
+      <div class="field">
+        <span class="field-hint">AI check every (sec)</span>
+        <input class="input" id="aiIntervalInput" type="number" min="15" max="120" />
+      </div>
+    </div>
+    <div class="privacy-note">
+      Screen &amp; webcam frames are analyzed locally in your browser and never saved to disk.
+      Only when AI section detection is on does a downscaled screenshot get sent to Claude for
+      that one check — it's discarded server-side right after. Webcam frames never leave this machine.
+    </div>
+  </div>
+
+  <div class="tracking-bar" id="trackingBar">
+    <div class="tracking-status" id="trackingStatus"></div>
+    <button class="tracking-btn enable" id="trackingToggleBtn">Enable tracking</button>
+  </div>
+  <div id="trackingErrorArea"></div>
+
+  <div id="aiBannerArea"></div>
+
+  <div class="timer-card">
+    <div class="run-label" id="runLabel"></div>
+    <div class="big-time" id="bigTime">00:00.00</div>
+    <div id="deltaArea"></div>
+    <div class="control-row" id="controlRow"></div>
+  </div>
+
+  <div class="splits-card" id="splitsCard"></div>
+
+  <div class="finish-card" id="finishCard"></div>
+
+  <div id="saveErrorArea"></div>
+
+  <div class="history-header">
+    <div class="history-title">⚡ Recent runs</div>
+    <button class="clear-btn" id="clearBtn" style="display:none;">🗑 Clear all</button>
+  </div>
+  <div id="historyArea"></div>
+
+</div>
+
+<script src="/assets/tracking.js"></script>
+<script src="/assets/app.js"></script>
+</body>
+</html>
