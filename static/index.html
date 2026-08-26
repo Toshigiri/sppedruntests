@@ -12,7 +12,7 @@
 <div class="container">
 
   <div class="header">
-    <div>
+    <div class="header-title">
       <div class="eyebrow">EXAM SPEEDRUN</div>
       <div class="h1">Any% — No Skips</div>
     </div>
@@ -20,8 +20,10 @@
   </div>
 
   <div class="mode-row">
-    <button class="mode-btn" id="modePaperBtn">Full Paper</button>
-    <button class="mode-btn" id="modeDrillBtn">Topic Drill</button>
+    <div class="mode-toggle-group">
+      <button class="mode-btn" id="modePaperBtn">Full Paper</button>
+      <button class="mode-btn" id="modeDrillBtn">Topic Drill</button>
+    </div>
     <button class="config-btn" id="configToggle" title="Configure">⚙</button>
   </div>
 
@@ -35,8 +37,10 @@
     <div id="drillConfig" style="display:none;">
       <div class="label">Drill topic</div>
       <div class="chip-row" id="topicChips"></div>
-      <div class="label">Question count</div>
-      <input class="input" id="drillCountInput" type="number" min="1" max="50" style="width:90px;" />
+      <div class="field" style="margin-top:2px;">
+        <span class="field-hint">Question count</span>
+        <input class="input" id="drillCountInput" type="number" min="1" max="50" style="width:90px;" />
+      </div>
     </div>
 
     <div class="section-divider">TRACKING</div>

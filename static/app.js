@@ -1,12 +1,12 @@
 // ---------- data ----------
 const SUBJECTS = {
   maths: {
-    label: "Maths", code: "1MA1", accent: "#6EE7C0",
+    label: "Maths", code: "1MA1",
     paperDefault: { name: "Paper 1", sections: ["Q1–10", "Q11–20", "Q21–25", "Review"] },
     drillTopics: ["Algebra", "Geometry", "Number", "Statistics", "Ratio & Proportion", "Circle Theorems"],
   },
   english: {
-    label: "English Lang B", code: "4EB1", accent: "#F2A65A",
+    label: "English Lang B", code: "4EB1",
     paperDefault: { name: "Paper 1", sections: ["Section A: Reading", "Section B: Writing", "Review"] },
     drillTopics: ["Article Writing", "Comprehension", "Summary", "Vocabulary", "Narrative Writing"],
   },
@@ -260,7 +260,7 @@ function applyTrackingConfig() {
 // ---------- render ----------
 function render(tickOnly) {
   const s = subject();
-  document.documentElement.style.setProperty("--accent", s.accent);
+  document.documentElement.setAttribute("data-subject", subjectKey);
 
   if (!tickOnly) {
     // subject switch
@@ -314,25 +314,25 @@ function render(tickOnly) {
     if (!running) {
       const startBtn = document.createElement("button");
       startBtn.className = "main-btn";
-      startBtn.innerHTML = "▶ Start Run";
+      startBtn.innerHTML = `<span class="btn-glyph">▶</span>Start Run`;
       startBtn.onclick = start;
       cr.appendChild(startBtn);
       if (elapsed > 0 || splits.length > 0) {
         const resetBtn = document.createElement("button");
         resetBtn.className = "ghost-btn";
-        resetBtn.innerHTML = "↺ Reset";
+        resetBtn.innerHTML = `<span class="btn-glyph">↺</span>Reset`;
         resetBtn.onclick = reset;
         cr.appendChild(resetBtn);
       }
     } else {
       const splitBtn = document.createElement("button");
       splitBtn.className = "main-btn";
-      splitBtn.innerHTML = "› Split";
+      splitBtn.innerHTML = `<span class="btn-glyph">›</span>Split`;
       splitBtn.onclick = split;
       cr.appendChild(splitBtn);
       const stopBtn = document.createElement("button");
       stopBtn.className = "stop-btn";
-      stopBtn.innerHTML = "■ Finish";
+      stopBtn.innerHTML = `<span class="btn-glyph">■</span>Finish`;
       stopBtn.onclick = stopEarly;
       cr.appendChild(stopBtn);
     }
@@ -347,14 +347,14 @@ function render(tickOnly) {
     saveErrorArea.innerHTML = "";
     if (justFinished && !running) {
       finishCard.className = "finish-card open";
-      finishCard.style.borderColor = justFinished.isPB ? s.accent : "#2a2d33";
+      finishCard.style.borderColor = justFinished.isPB ? "var(--accent-line)" : "var(--card-border)";
       const diff = justFinished.priorBest != null ? justFinished.totalMs - justFinished.priorBest : -1;
       let html = "";
       if (justFinished.isPB) html += `<div class="pb-badge">\u{1F3C6} NEW PB</div>`;
-      html += `<div class="finish-time" style="color:${diff > 0 ? 'var(--red)' : 'var(--green)'}">${fmt(justFinished.totalMs)}</div>`;
       if (justFinished.priorBest != null) {
         html += `<div class="finish-sub ${diff < 0 ? 'neg' : 'pos'}">${fmtDelta(diff)} vs previous best</div>`;
       }
+      html += `<div class="finish-time" style="color:${diff > 0 ? 'var(--red)' : 'var(--green)'}">${fmt(justFinished.totalMs)}</div>`;
       finishCard.innerHTML = html;
       if (justFinished.saving) {
         saveErrorArea.innerHTML = `<div style="font-size:12px;color:var(--text-faint);">Saving run…</div>`;
@@ -381,7 +381,7 @@ function render(tickOnly) {
             <div class="history-date">${new Date(r.date).toLocaleDateString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</div>
           </div>
           <div class="history-right">
-            ${r.isPB ? `<span style="color:${s.accent};">\u{1F3C6}</span>` : ""}
+            ${r.isPB ? `<span style="color:var(--accent);">\u{1F3C6}</span>` : ""}
             <span class="history-time">${fmt(r.totalMs)}</span>
           </div>
         </div>`).join("") + `</div>`;
