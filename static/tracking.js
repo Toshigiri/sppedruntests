@@ -5,7 +5,7 @@
 //   pixel diffing — nothing about those streams ever leaves the browser.
 // - AI section detection is the one thing that leaves the machine: every
 //   `aiIntervalMs` (while enabled) a downscaled screenshot is POSTed to the
-//   local backend, which relays it to Claude and immediately discards it.
+//   local backend, which relays it to a local LM Studio server and discards it.
 //   Webcam frames are never sent anywhere, in any mode.
 // ---------------------------------------------------------------------
 const Tracker = (() => {
@@ -146,8 +146,10 @@ const Tracker = (() => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ image, subject: ctxInfo.subject, labels, currentIndex: ctxInfo.sectionIdx }),
       });
-      if (res.status === 400) {
-        aiDisabledReason = "no-api-key";
+      if (res.status === 503) {
+        // LM Studio isn't reachable/running — stop polling until tracking is
+        // toggled off and back on (e.g. after starting LM Studio).
+        aiDisabledReason = "lm-studio-unreachable";
         if (aiTimer) { clearInterval(aiTimer); aiTimer = null; }
         emitStatus();
         return;

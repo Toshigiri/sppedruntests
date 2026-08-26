@@ -427,7 +427,7 @@ function renderTrackingBar() {
     let dotClass = "rec-dot";
     if (st.awayOngoing) { label = "Away from desk…"; dotClass += " idle"; }
     else if (st.idleOngoing) { label = "Idle — no screen activity…"; dotClass += " idle"; }
-    if (st.aiDisabledReason === "no-api-key") label += " · AI checks off (no API key)";
+    if (st.aiDisabledReason === "lm-studio-unreachable") label += " · AI checks off (LM Studio not reachable)";
     statusEl.innerHTML = `<span class="${dotClass}"></span><span class="txt">${label}</span>`;
     btn.textContent = "Stop tracking";
     btn.className = "tracking-btn";

@@ -6,16 +6,17 @@ services:
     buildCommand: pip install -r requirements.txt
     startCommand: python server.py
     envVars:
-      - key: ANTHROPIC_API_KEY
-        sync: false
-      - key: ANTHROPIC_MODEL
-        value: claude-haiku-4-5-20251001
       - key: APP_USERNAME
         sync: false
       - key: APP_PASSWORD
         sync: false
 
-# Note: the free plan's filesystem is ephemeral — data/runs.json (and any
+# Note 1: AI section detection calls a local LM Studio server on whatever
+# machine this backend runs on. On Render, that's Render's own container —
+# not your PC — so that one feature won't work on the deployed copy. Timer,
+# splits, PBs, and local idle/away tracking are unaffected.
+#
+# Note 2: the free plan's filesystem is ephemeral — data/runs.json (and any
 # run history) resets on every redeploy/restart. To persist history across
 # deploys, upgrade this service to a paid plan, attach a persistent disk
 # mounted at e.g. /data, and set DATA_DIR=/data as an env var.

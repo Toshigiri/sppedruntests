@@ -16,15 +16,21 @@ copy .env.example .env                              # Windows
 # cp .env.example .env                               # macOS/Linux
 ```
 
-Open `.env` and set:
+AI section detection uses a local model via **LM Studio** instead of a paid cloud API —
+the timer, splits, PBs, and idle/away tracking all work without it, so this step is
+optional:
 
-```
-ANTHROPIC_API_KEY=sk-ant-...
-```
+1. Install [LM Studio](https://lmstudio.ai/).
+2. In its model browser, download a vision-capable model — `gemma-3-4b-it` is a good
+   default (small, fast, decent at reading on-screen text). For better accuracy on a
+   beefier machine, `qwen2.5-vl-7b` reads small text more reliably.
+3. Load the model, then go to the **Developer** tab → **Start Server** (default
+   `http://localhost:1234`).
+4. If you used a different model, update `LM_STUDIO_MODEL` in `.env` to match its exact
+   id (check `http://localhost:1234/v1/models` while the server is running).
 
-Get a key at https://console.anthropic.com/settings/keys. This is only needed if you
-want the **AI section detection** feature — the timer, splits, PBs, and idle/away
-tracking all work without one.
+LM Studio needs to be running with a model loaded whenever you want the AI check —
+everything else works fine without it.
 
 ## Run
 
@@ -56,13 +62,14 @@ plain `.html` file — `getUserMedia`/`getDisplayMedia` are blocked on `file://`
   essentially static (you've stepped away, or you're being unusually still) for longer
   than the "away after" threshold (default 20s), it's logged as an away spell. Webcam
   frames are never sent anywhere, analyzed or not.
-- **AI section detection (optional, needs an API key)** — every "AI check every N sec"
-  (default 25s), a downscaled screenshot is sent to the local server, which forwards it
-  to Claude asking "which section/question from this run's list is currently visible?"
-  If Claude's answer disagrees with the split you're currently tracking, a banner appears
-  with **Split** / **Dismiss** — it never auto-splits on its own, since a false positive
-  would corrupt your run data. The screenshot is not saved anywhere; it's discarded by
-  the server as soon as the response comes back.
+- **AI section detection (optional, needs LM Studio running locally)** — every "AI check
+  every N sec" (default 25s), a downscaled screenshot is sent to your local backend, which
+  forwards it to LM Studio asking "which section/question from this run's list is
+  currently visible?" If the model's answer disagrees with the split you're currently
+  tracking, a banner appears with **Split** / **Dismiss** — it never auto-splits on its
+  own, since a false positive would corrupt your run data. The screenshot is not saved
+  anywhere; it's discarded as soon as the response comes back. If LM Studio isn't running,
+  this just quietly turns itself off (visible in the tracking bar) — nothing else breaks.
 - **Per-split breakdown** — after a run finishes, each split row shows any idle/away
   spells and AI flags that happened during it, so you can see *why* a section was slow,
   not just that it was slow.
@@ -76,11 +83,9 @@ plain `.html` file — `getUserMedia`/`getDisplayMedia` are blocked on `file://`
 - Raw webcam video and raw screen video/images are never written to disk. The only things
   persisted are: idle/away timestamps and durations, AI-flag decisions, and your run/split
   times — never the frames themselves.
-- The only image data that ever leaves your machine is the small set of downscaled
-  screenshots sent for AI section detection (only while that feature is on), and only to
-  Anthropic's API via your own server. Webcam frames are 100% local, always.
-- Your Anthropic API key lives only in `.env` on your machine and is read server-side; it
-  is never sent to or stored in the browser.
+- AI section detection runs against LM Studio on your own machine — no cloud API, no key,
+  no image data ever leaves your computer. Webcam frames are 100% local, always, in every
+  mode.
 
 ## Deploying (Render)
 
@@ -88,11 +93,16 @@ This is a single-user tool by design — deploying it publicly means anyone with
 could use it, so set `APP_PASSWORD` before you do (it gates the whole app behind a
 browser login prompt; unset locally, it stays open for convenience).
 
+**AI section detection will not work on the deployed copy** — it calls LM Studio on
+whatever machine the backend runs on, and on Render that's Render's container, not your
+PC. Timer, splits, PBs, and local idle/away tracking are unaffected; only the AI-flag
+banner won't fire remotely. Run locally on this machine (with LM Studio running) if you
+want that feature.
+
 1. Push this repo to GitHub (see steps below if you haven't yet).
 2. On https://dashboard.render.com → **New** → **Blueprint**, point it at the repo.
    Render reads `render.yaml` and creates the service automatically.
 3. In the service's **Environment** tab, set:
-   - `ANTHROPIC_API_KEY` — your key
    - `APP_USERNAME` — whatever login name you want (default `exam`)
    - `APP_PASSWORD` — a real password, not blank
 4. Deploy. Render gives you an HTTPS URL like `exam-speedrun.onrender.com` — camera/screen
@@ -120,7 +130,7 @@ already has its own.)
 ## Project layout
 
 ```
-server.py          FastAPI backend: static file serving, run persistence, Claude relay
+server.py          FastAPI backend: static file serving, run persistence, LM Studio relay
 static/index.html  Page shell
 static/style.css   Design system (dark, JetBrains Mono numerals, Inter UI, per-subject accent)
 static/app.js      Timer/splits/PB state, rendering, run persistence

@@ -5,8 +5,9 @@ Thin relay + JSON persistence. Serves the frontend from ./static and
 exposes two small API surfaces:
   - /api/runs           run history / PBs, persisted to data/runs.json
   - /api/vision/section  downscaled-screenshot -> "which section is this"
-                         via the Claude API (server-side only, key never
-                         reaches the browser)
+                         via a local LM Studio server (no cloud API, no key —
+                         only reachable when this backend and LM Studio are
+                         running on the same machine)
 
 Run with: python server.py
 """
@@ -18,6 +19,7 @@ import secrets
 import threading
 from pathlib import Path
 
+import requests
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, Response
@@ -32,8 +34,13 @@ DATA_DIR = Path(os.environ.get("DATA_DIR") or (ROOT / "data"))
 DATA_FILE = DATA_DIR / "runs.json"
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
-ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "").strip()
-ANTHROPIC_MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-haiku-4-5-20251001").strip()
+# LM Studio's local server (Developer tab -> Start Server), OpenAI-compatible.
+# Only reachable from wherever this backend process itself is running — if
+# you deploy this app to a host like Render, AI section detection will fail
+# there (LM Studio is on your PC, not the host), while the timer/splits/PB/
+# idle-away tracking keep working fine.
+LM_STUDIO_BASE_URL = (os.environ.get("LM_STUDIO_BASE_URL") or "http://localhost:1234/v1").rstrip("/")
+LM_STUDIO_MODEL = os.environ.get("LM_STUDIO_MODEL", "gemma-3-4b-it").strip()
 
 # Set APP_PASSWORD when deploying anywhere reachable off your own machine —
 # it gates the whole app behind HTTP Basic Auth. Left unset for local dev,
@@ -129,67 +136,69 @@ class SectionCheckRequest(BaseModel):
 
 @app.post("/api/vision/section")
 def vision_section_check(req: SectionCheckRequest):
-    if not ANTHROPIC_API_KEY:
-        raise HTTPException(
-            status_code=400,
-            detail="No ANTHROPIC_API_KEY configured on the server — set it in .env to enable AI section detection.",
-        )
-
-    m = DATA_URL_RE.match(req.image)
-    if not m:
+    if not DATA_URL_RE.match(req.image):
         raise HTTPException(status_code=400, detail="image must be a data: URL")
-    media_type, b64_data = m.group(1), m.group(2)
-
     if not req.labels:
         raise HTTPException(status_code=400, detail="labels list is empty")
 
     labels_block = "\n".join(f"{i}: {label}" for i, label in enumerate(req.labels))
 
-    from anthropic import Anthropic
-
-    client = Anthropic(api_key=ANTHROPIC_API_KEY)
     try:
-        resp = client.messages.create(
-            model=ANTHROPIC_MODEL,
-            max_tokens=200,
-            system=(
-                "You are watching a screenshot of a student working through an exam paper or a "
-                "set of practice questions. You are given a numbered list of the sections/questions "
-                "in their current run. Identify which one is currently visible/being worked on. "
-                "Reply with ONLY a JSON object, no prose, no markdown fences: "
-                '{"index": <int, 0-based index into the list, or -1 if you cannot tell>, '
-                '"confidence": <float 0-1>}'
-            ),
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "image",
-                            "source": {"type": "base64", "media_type": media_type, "data": b64_data},
-                        },
-                        {
-                            "type": "text",
-                            "text": (
-                                f"Subject: {req.subject}\n"
-                                f"Sections/questions (0-based index: label):\n{labels_block}\n\n"
-                                f"Currently tracked as index {req.currentIndex}. "
-                                "Which index is actually visible on screen right now?"
-                            ),
-                        },
-                    ],
-                }
-            ],
+        resp = requests.post(
+            f"{LM_STUDIO_BASE_URL}/chat/completions",
+            json={
+                "model": LM_STUDIO_MODEL,
+                "max_tokens": 200,
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": (
+                            "You are watching a screenshot of a student working through an exam paper "
+                            "or a set of practice questions. You are given a numbered list of the "
+                            "sections/questions in their current run. Identify which one is currently "
+                            "visible/being worked on. Reply with ONLY a JSON object, no prose, no "
+                            'markdown fences: {"index": <int, 0-based index into the list, or -1 if you '
+                            'cannot tell>, "confidence": <float 0-1>}'
+                        ),
+                    },
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "image_url", "image_url": {"url": req.image}},
+                            {
+                                "type": "text",
+                                "text": (
+                                    f"Subject: {req.subject}\n"
+                                    f"Sections/questions (0-based index: label):\n{labels_block}\n\n"
+                                    f"Currently tracked as index {req.currentIndex}. "
+                                    "Which index is actually visible on screen right now?"
+                                ),
+                            },
+                        ],
+                    },
+                ],
+            },
+            timeout=30,
         )
-    except Exception as e:  # noqa: BLE001 — surface as a clean 502 to the frontend
-        raise HTTPException(status_code=502, detail=f"Claude API call failed: {e}") from e
+        resp.raise_for_status()
+    except requests.exceptions.ConnectionError as e:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Couldn't reach LM Studio at {LM_STUDIO_BASE_URL} — make sure it's running with a "
+                   "model loaded (Developer tab -> Start Server).",
+        ) from e
+    except requests.exceptions.RequestException as e:
+        raise HTTPException(status_code=502, detail=f"LM Studio call failed: {e}") from e
 
-    text = "".join(block.text for block in resp.content if getattr(block, "type", None) == "text").strip()
+    text = resp.json()["choices"][0]["message"]["content"].strip()
+    # local models often ignore "no markdown fences" and wrap the JSON in
+    # ```json ... ``` anyway — pull out the first {...} blob regardless.
+    json_match = re.search(r"\{.*\}", text, re.DOTALL)
     try:
-        parsed = json.loads(text)
+        parsed = json.loads(json_match.group(0) if json_match else text)
         index = int(parsed.get("index", -1))
         confidence = float(parsed.get("confidence", 0))
-    except (json.JSONDecodeError, TypeError, ValueError):
+    except (json.JSONDecodeError, TypeError, ValueError, KeyError, IndexError, AttributeError):
         index, confidence = -1, 0.0
 
     if index < -1 or index >= len(req.labels):

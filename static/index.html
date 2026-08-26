@@ -42,7 +42,7 @@
     <div class="section-divider">TRACKING</div>
     <div class="checkbox-row">
       <input type="checkbox" id="aiEnabledInput" />
-      <label for="aiEnabledInput">Enable AI section detection (sends downscaled screenshots to Claude)</label>
+      <label for="aiEnabledInput">Enable AI section detection (sends downscaled screenshots to your local LM Studio)</label>
     </div>
     <div class="tracking-config-row">
       <div class="field">
@@ -60,8 +60,10 @@
     </div>
     <div class="privacy-note">
       Screen &amp; webcam frames are analyzed locally in your browser and never saved to disk.
-      Only when AI section detection is on does a downscaled screenshot get sent to Claude for
-      that one check — it's discarded server-side right after. Webcam frames never leave this machine.
+      Only when AI section detection is on does a downscaled screenshot get sent to your local
+      LM Studio server for that one check — nothing leaves your machine, and it's discarded right
+      after. Webcam frames never leave this machine either way. This check only works when LM
+      Studio is running on the same machine as this app.
     </div>
   </div>
 
