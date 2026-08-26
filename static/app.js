@@ -91,6 +91,7 @@ let sectionNames = SUBJECTS.maths.paperDefault.sections.slice();
 let paperName = SUBJECTS.maths.paperDefault.name;
 let drillTopic = SUBJECTS.maths.drillTopics[0];
 let drillCount = 10;
+let drillQuestions = ""; // raw text; non-empty overrides drillCount with specific labels
 let justFinished = null;
 let runEvents = [];
 let aiSuggestion = null;
@@ -99,8 +100,13 @@ let trackingError = null;
 let trackingConfig = { idleAfterSec: 90, awaySec: 20, aiIntervalSec: 25, aiEnabled: true, webcamEnabled: true };
 
 function subject() { return SUBJECTS[subjectKey]; }
+function parseDrillQuestions(raw) {
+  return raw.split(/[,\n]/).map((s) => s.trim()).filter(Boolean).map((s) => /^\d+$/.test(s) ? `Q${s}` : s);
+}
 function activeLabels() {
-  return mode === MODES.PAPER ? sectionNames : Array.from({ length: drillCount }, (_, i) => `Q${i + 1}`);
+  if (mode === MODES.PAPER) return sectionNames;
+  const custom = parseDrillQuestions(drillQuestions);
+  return custom.length ? custom : Array.from({ length: drillCount }, (_, i) => `Q${i + 1}`);
 }
 function currentKey() {
   return mode === MODES.PAPER ? `paper:${subjectKey}:${paperName}` : `drill:${subjectKey}:${drillTopic}`;
@@ -159,7 +165,7 @@ function finish(totalMs) {
   clearAiSuggestion();
   const label = mode === MODES.PAPER
     ? `${subject().label} — ${paperName}`
-    : `${subject().label} — ${drillTopic} ×${drillCount}`;
+    : `${subject().label} — ${drillTopic} ×${activeLabels().length}`;
   const key = currentKey();
   const priorBestRun = bestForKey(key);
   const priorBest = priorBestRun ? priorBestRun.totalMs : Infinity;
@@ -287,6 +293,7 @@ function render(tickOnly) {
     document.getElementById("paperNameInput").value = paperName;
     document.getElementById("sectionsInput").value = sectionNames.join("\n");
     document.getElementById("drillCountInput").value = drillCount;
+    document.getElementById("drillQuestionsInput").value = drillQuestions;
     document.getElementById("webcamEnabledInput").checked = trackingConfig.webcamEnabled;
     document.getElementById("webcamEnabledInput").disabled = Tracker.isActive();
     document.getElementById("aiEnabledInput").checked = trackingConfig.aiEnabled;
@@ -306,7 +313,7 @@ function render(tickOnly) {
 
     // run label
     document.getElementById("runLabel").textContent = mode === MODES.PAPER
-      ? `${s.code} · ${paperName}` : `${s.code} · ${drillTopic} ×${drillCount}`;
+      ? `${s.code} · ${paperName}` : `${s.code} · ${drillTopic} ×${activeLabels().length}`;
 
     // control row
     const cr = document.getElementById("controlRow");
@@ -526,6 +533,7 @@ function onSubjectChange() {
   sectionNames = SUBJECTS[subjectKey].paperDefault.sections.slice();
   paperName = SUBJECTS[subjectKey].paperDefault.name;
   drillTopic = SUBJECTS[subjectKey].drillTopics[0];
+  drillQuestions = "";
 }
 
 // ---------- event wiring (static elements) ----------
@@ -540,6 +548,10 @@ document.getElementById("sectionsInput").oninput = (e) => {
 };
 document.getElementById("drillCountInput").oninput = (e) => {
   drillCount = Math.max(1, Math.min(50, Number(e.target.value) || 1));
+  render();
+};
+document.getElementById("drillQuestionsInput").oninput = (e) => {
+  drillQuestions = e.target.value;
   render();
 };
 document.getElementById("clearBtn").onclick = clearHistory;
