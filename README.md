@@ -82,6 +82,41 @@ plain `.html` file — `getUserMedia`/`getDisplayMedia` are blocked on `file://`
 - Your Anthropic API key lives only in `.env` on your machine and is read server-side; it
   is never sent to or stored in the browser.
 
+## Deploying (Render)
+
+This is a single-user tool by design — deploying it publicly means anyone with the URL
+could use it, so set `APP_PASSWORD` before you do (it gates the whole app behind a
+browser login prompt; unset locally, it stays open for convenience).
+
+1. Push this repo to GitHub (see steps below if you haven't yet).
+2. On https://dashboard.render.com → **New** → **Blueprint**, point it at the repo.
+   Render reads `render.yaml` and creates the service automatically.
+3. In the service's **Environment** tab, set:
+   - `ANTHROPIC_API_KEY` — your key
+   - `APP_USERNAME` — whatever login name you want (default `exam`)
+   - `APP_PASSWORD` — a real password, not blank
+4. Deploy. Render gives you an HTTPS URL like `exam-speedrun.onrender.com` — camera/screen
+   permissions work there since it's HTTPS.
+5. **Custom domain (optional):** in the service's **Settings → Custom Domains**, add your
+   domain and follow Render's instructions to point a CNAME (or A record) at it from your
+   DNS provider. Render issues the TLS certificate automatically once DNS resolves.
+
+**Persistence note:** the free plan's disk is ephemeral — `data/runs.json` resets on every
+redeploy or restart. To keep run history permanently, upgrade the service to a paid plan,
+attach a persistent disk (Render dashboard → Disks), mount it at e.g. `/data`, and set the
+`DATA_DIR=/data` env var.
+
+### Pushing to GitHub for the first time
+
+```bash
+git remote add origin https://github.com/<your-username>/exam-speedrun.git
+git branch -M main
+git push -u origin main
+```
+
+(Create the empty repo on GitHub first — no README/license/gitignore, since this repo
+already has its own.)
+
 ## Project layout
 
 ```
